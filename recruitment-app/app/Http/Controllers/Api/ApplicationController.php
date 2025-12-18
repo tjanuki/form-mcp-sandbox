@@ -3,6 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\StoreApplicationRequest;
+use App\Http\Requests\UpdateApplicationStatusRequest;
+use App\Http\Resources\ApplicationResource;
 use App\Models\Application;
 use App\Models\Recruitment;
 use Illuminate\Http\Request;
@@ -12,6 +15,8 @@ class ApplicationController extends Controller
 {
     public function index(Recruitment $recruitment, Request $request): JsonResponse
     {
+        $this->authorize('viewAny', Application::class);
+
         $query = $recruitment->applications();
 
         if ($request->has('status')) {
@@ -23,40 +28,39 @@ class ApplicationController extends Controller
         return response()->json([
             'recruitment_id' => $recruitment->id,
             'recruitment_title' => $recruitment->title,
-            'applications' => $applications,
+            'applications' => ApplicationResource::collection($applications),
             'total' => $applications->count(),
-        ]);
+        ], 200);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreApplicationRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'recruitment_id' => 'required|exists:recruitments,id',
-            'applicant_name' => 'required|string|max:255',
-            'applicant_email' => 'required|email|max:255',
-            'applicant_phone' => 'nullable|string|max:255',
-            'resume_path' => 'nullable|string',
-            'cover_letter' => 'nullable|string',
-        ]);
-
+        $validated = $request->validated();
         $application = Application::create($validated);
 
-        return response()->json($application, 201);
+        return (new ApplicationResource($application))
+            ->response()
+            ->setStatusCode(201);
     }
 
     public function show(Application $application): JsonResponse
     {
-        return response()->json($application->load('recruitment'));
+        $this->authorize('view', $application);
+
+        return (new ApplicationResource($application->load('recruitment')))
+            ->response()
+            ->setStatusCode(200);
     }
 
-    public function updateStatus(Request $request, Application $application): JsonResponse
+    public function updateStatus(UpdateApplicationStatusRequest $request, Application $application): JsonResponse
     {
-        $validated = $request->validate([
-            'status' => 'required|in:pending,reviewing,shortlisted,rejected,hired',
-        ]);
+        $this->authorize('updateStatus', $application);
 
+        $validated = $request->validated();
         $application->update($validated);
 
-        return response()->json($application);
+        return (new ApplicationResource($application))
+            ->response()
+            ->setStatusCode(200);
     }
 }

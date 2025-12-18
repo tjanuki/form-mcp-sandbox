@@ -3,6 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\StoreRecruitmentRequest;
+use App\Http\Requests\UpdateRecruitmentRequest;
+use App\Http\Resources\RecruitmentResource;
 use App\Models\Recruitment;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -11,7 +14,9 @@ class RecruitmentController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $query = Recruitment::query()->with('creator', 'applications');
+        $this->authorize('viewAny', Recruitment::class);
+
+        $query = Recruitment::query()->with('creator')->withCount('applications');
 
         if ($request->has('status')) {
             $query->where('status', $request->status);
@@ -34,60 +39,43 @@ class RecruitmentController extends Controller
         $perPage = $request->get('limit', 10);
         $recruitments = $query->latest()->paginate($perPage);
 
-        return response()->json($recruitments);
+        return RecruitmentResource::collection($recruitments)
+            ->response()
+            ->setStatusCode(200);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreRecruitmentRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'company_name' => 'required|string|max:255',
-            'location' => 'required|string|max:255',
-            'employment_type' => 'required|in:full-time,part-time,contract,internship',
-            'salary_min' => 'nullable|numeric|min:0',
-            'salary_max' => 'nullable|numeric|min:0',
-            'salary_currency' => 'nullable|string|max:10',
-            'description' => 'required|string',
-            'requirements' => 'required|string',
-            'responsibilities' => 'required|string',
-            'benefits' => 'nullable|string',
-            'application_deadline' => 'nullable|date',
-            'status' => 'nullable|in:draft,published,closed,filled',
-        ]);
+        $this->authorize('create', Recruitment::class);
 
+        $validated = $request->validated();
         $validated['created_by'] = $request->user()->id;
 
-        if (isset($validated['status']) && $validated['status'] === 'published' && !isset($validated['published_at'])) {
+        if (isset($validated['status']) && $validated['status'] === 'published') {
             $validated['published_at'] = now();
         }
 
         $recruitment = Recruitment::create($validated);
 
-        return response()->json($recruitment->load('creator'), 201);
+        return (new RecruitmentResource($recruitment->load('creator')))
+            ->response()
+            ->setStatusCode(201);
     }
 
     public function show(Recruitment $recruitment): JsonResponse
     {
-        return response()->json($recruitment->load(['creator', 'applications']));
+        $this->authorize('view', $recruitment);
+
+        return (new RecruitmentResource($recruitment->load(['creator', 'applications'])))
+            ->response()
+            ->setStatusCode(200);
     }
 
-    public function update(Request $request, Recruitment $recruitment): JsonResponse
+    public function update(UpdateRecruitmentRequest $request, Recruitment $recruitment): JsonResponse
     {
-        $validated = $request->validate([
-            'title' => 'sometimes|string|max:255',
-            'company_name' => 'sometimes|string|max:255',
-            'location' => 'sometimes|string|max:255',
-            'employment_type' => 'sometimes|in:full-time,part-time,contract,internship',
-            'salary_min' => 'nullable|numeric|min:0',
-            'salary_max' => 'nullable|numeric|min:0',
-            'salary_currency' => 'nullable|string|max:10',
-            'description' => 'sometimes|string',
-            'requirements' => 'sometimes|string',
-            'responsibilities' => 'sometimes|string',
-            'benefits' => 'nullable|string',
-            'application_deadline' => 'nullable|date',
-            'status' => 'nullable|in:draft,published,closed,filled',
-        ]);
+        $this->authorize('update', $recruitment);
+
+        $validated = $request->validated();
 
         if (isset($validated['status']) && $validated['status'] === 'published' && !$recruitment->published_at) {
             $validated['published_at'] = now();
@@ -95,30 +83,44 @@ class RecruitmentController extends Controller
 
         $recruitment->update($validated);
 
-        return response()->json($recruitment->load('creator'));
+        return (new RecruitmentResource($recruitment->load('creator')))
+            ->response()
+            ->setStatusCode(200);
     }
 
     public function destroy(Recruitment $recruitment): JsonResponse
     {
+        $this->authorize('delete', $recruitment);
+
         $recruitment->delete();
 
-        return response()->json(['message' => 'Recruitment deleted successfully']);
+        return response()->json([
+            'message' => 'Recruitment deleted successfully'
+        ], 200);
     }
 
     public function publish(Recruitment $recruitment): JsonResponse
     {
+        $this->authorize('publish', $recruitment);
+
         $recruitment->update([
             'status' => 'published',
             'published_at' => $recruitment->published_at ?? now(),
         ]);
 
-        return response()->json($recruitment->load('creator'));
+        return (new RecruitmentResource($recruitment->load('creator')))
+            ->response()
+            ->setStatusCode(200);
     }
 
     public function close(Recruitment $recruitment): JsonResponse
     {
+        $this->authorize('close', $recruitment);
+
         $recruitment->update(['status' => 'closed']);
 
-        return response()->json($recruitment->load('creator'));
+        return (new RecruitmentResource($recruitment->load('creator')))
+            ->response()
+            ->setStatusCode(200);
     }
 }
