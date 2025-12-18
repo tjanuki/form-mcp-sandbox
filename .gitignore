@@ -18,8 +18,11 @@ ehthumbs.db
 Thumbs.db
 
 # Environment and secrets
+.env
 .env.local
 .env.*.local
+recruitment-app/.env
+recruitment-mcp-server/.env
 
 # Logs
 *.log
@@ -30,3 +33,19 @@ yarn-error.log*
 # Temporary files
 *.tmp
 *.temp
+
+# Node.js (MCP Server)
+recruitment-mcp-server/node_modules/
+recruitment-mcp-server/dist/
+recruitment-mcp-server/*.tsbuildinfo
+
+# Laravel (Recruitment App)
+recruitment-app/vendor/
+recruitment-app/node_modules/
+recruitment-app/public/hot
+recruitment-app/public/storage
+recruitment-app/storage/*.key
+recruitment-app/storage/logs/*.log
+recruitment-app/bootstrap/cache/*
+!recruitment-app/bootstrap/cache/.gitkeep
+recruitment-app/.phpunit.result.cache

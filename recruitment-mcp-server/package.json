@@ -1,0 +1,37 @@
+{
+  "name": "recruitment-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for recruitment management system - ChatGPT integration",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc && node build.js",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "inspect": "node --inspect dist/index.js"
+  },
+  "keywords": [
+    "mcp",
+    "recruitment",
+    "chatgpt",
+    "model-context-protocol"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "axios": "^1.7.9",
+    "dotenv": "^16.4.7",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "esbuild": "^0.24.2",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
