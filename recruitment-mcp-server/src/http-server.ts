@@ -5,12 +5,16 @@ import cors from 'cors';
 import { config } from 'dotenv';
 import { createServer } from 'http';
 import { createMCPServer } from './index.js';
+import { randomUUID } from 'crypto';
 
 // Load environment variables
 config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Store active SSE transports by session ID
+const activeTransports = new Map<string, SSEServerTransport>();
 
 // ==================== Middleware ====================
 
@@ -23,6 +27,7 @@ app.use(cors({
   ],
   credentials: true,
   methods: ['GET', 'POST', 'OPTIONS'],
+  exposedHeaders: ['MCP-Session-Id'],
 }));
 
 app.use(express.json());
@@ -64,8 +69,8 @@ app.get('/info', (req: Request, res: Response) => {
   });
 });
 
-// SSE endpoint for MCP connections
-app.get('/sse', async (req: Request, res: Response) => {
+// SSE handler function
+const handleSSEConnection = async (req: Request, res: Response) => {
   console.log('📡 New SSE connection request');
   console.log('   Origin:', req.headers.origin || 'unknown');
   console.log('   User-Agent:', req.headers['user-agent'] || 'unknown');
@@ -74,24 +79,23 @@ app.get('/sse', async (req: Request, res: Response) => {
     // Create a new MCP server instance for this connection
     const server = createMCPServer();
 
-    // Create SSE transport
+    // Create SSE transport (it will generate its own sessionId internally)
     const transport = new SSEServerTransport('/message', res);
+
+    // Store transport using its internally generated sessionId
+    activeTransports.set(transport.sessionId, transport);
+
+    console.log('✅ MCP server connected via SSE');
+    console.log('   Session ID:', transport.sessionId);
+    console.log('   Active transports:', activeTransports.size);
 
     // Connect the server to the transport
     await server.connect(transport);
 
-    console.log('✅ MCP server connected via SSE');
-
     // Handle client disconnect
-    req.on('close', () => {
-      console.log('❌ Client disconnected');
-      server.close().catch(console.error);
-    });
-
-    // Handle errors
-    req.on('error', (error) => {
-      console.error('⚠️  Request error:', error);
-      server.close().catch(console.error);
+    res.on('close', () => {
+      console.log('❌ Client disconnected - Session:', transport.sessionId);
+      activeTransports.delete(transport.sessionId);
     });
 
   } catch (error) {
@@ -104,13 +108,40 @@ app.get('/sse', async (req: Request, res: Response) => {
       });
     }
   }
-});
+};
+
+// SSE endpoint for MCP connections (with and without trailing slash)
+app.get('/sse', handleSSEConnection);
+app.get('/sse/', handleSSEConnection);
 
 // POST endpoint for messages (required by SSE transport)
 app.post('/message', async (req: Request, res: Response) => {
-  // The SSE transport handles this internally
-  // Just acknowledge receipt
-  res.status(200).send('OK');
+  // Get session ID from query parameter (standard MCP SSE pattern)
+  const sessionId = req.query.sessionId as string;
+
+  console.log('📨 Received POST /message - Session:', sessionId);
+
+  if (!sessionId) {
+    console.error('❌ No session ID provided');
+    return res.status(400).json({ error: 'Session ID required' });
+  }
+
+  const transport = activeTransports.get(sessionId);
+
+  if (!transport) {
+    console.error('❌ Session not found:', sessionId);
+    console.error('   Available sessions:', Array.from(activeTransports.keys()));
+    return res.status(404).json({ error: 'Session not found' });
+  }
+
+  if (!(transport instanceof SSEServerTransport)) {
+    console.error('❌ Invalid transport type for session:', sessionId);
+    return res.status(400).json({ error: 'Invalid transport type' });
+  }
+
+  // CRITICAL: Let the transport handle the message processing
+  await transport.handlePostMessage(req, res, req.body);
+  console.log('✅ Message handled by transport');
 });
 
 // 404 handler
