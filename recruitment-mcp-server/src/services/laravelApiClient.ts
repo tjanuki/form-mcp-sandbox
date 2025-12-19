@@ -61,16 +61,16 @@ export class LaravelApiClient {
    * Get a single recruitment by ID
    */
   async getRecruitment(id: number): Promise<Recruitment> {
-    const response = await this.client.get<Recruitment>(`/api/recruitments/${id}`);
-    return response.data;
+    const response = await this.client.get<{ data: Recruitment }>(`/api/recruitments/${id}`);
+    return response.data.data;
   }
 
   /**
    * Create a new recruitment
    */
   async createRecruitment(data: CreateRecruitmentParams): Promise<Recruitment> {
-    const response = await this.client.post<Recruitment>('/api/recruitments', data);
-    return response.data;
+    const response = await this.client.post<{ data: Recruitment }>('/api/recruitments', data);
+    return response.data.data;
   }
 
   /**
@@ -80,8 +80,8 @@ export class LaravelApiClient {
     id: number,
     data: UpdateRecruitmentParams
   ): Promise<Recruitment> {
-    const response = await this.client.put<Recruitment>(`/api/recruitments/${id}`, data);
-    return response.data;
+    const response = await this.client.put<{ data: Recruitment }>(`/api/recruitments/${id}`, data);
+    return response.data.data;
   }
 
   /**
@@ -95,20 +95,20 @@ export class LaravelApiClient {
    * Publish a recruitment (change status to 'published')
    */
   async publishRecruitment(id: number): Promise<Recruitment> {
-    const response = await this.client.patch<Recruitment>(
+    const response = await this.client.patch<{ data: Recruitment }>(
       `/api/recruitments/${id}/publish`
     );
-    return response.data;
+    return response.data.data;
   }
 
   /**
    * Close a recruitment (change status to 'closed')
    */
   async closeRecruitment(id: number): Promise<Recruitment> {
-    const response = await this.client.patch<Recruitment>(
+    const response = await this.client.patch<{ data: Recruitment }>(
       `/api/recruitments/${id}/close`
     );
-    return response.data;
+    return response.data.data;
   }
 
   // ==================== Application Endpoints ====================
@@ -116,9 +116,19 @@ export class LaravelApiClient {
   /**
    * List applications for a specific recruitment
    */
-  async listApplications(params: ListApplicationsParams): Promise<Application[]> {
+  async listApplications(params: ListApplicationsParams): Promise<{
+    recruitment_id: number;
+    recruitment_title: string;
+    applications: Application[];
+    total: number;
+  }> {
     const { recruitment_id, status } = params;
-    const response = await this.client.get<Application[]>(
+    const response = await this.client.get<{
+      recruitment_id: number;
+      recruitment_title: string;
+      applications: Application[];
+      total: number;
+    }>(
       `/api/recruitments/${recruitment_id}/applications`,
       { params: { status } }
     );

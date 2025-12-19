@@ -123,7 +123,7 @@ export async function getRecruitmentDetails(
               benefits: recruitment.benefits,
               application_deadline: recruitment.application_deadline,
               status: recruitment.status,
-              applications_count: recruitment.applications_count || 0,
+              applications_count: (recruitment as any).applications?.length || recruitment.applications_count || 0,
               created_at: recruitment.created_at,
               published_at: recruitment.published_at,
             },

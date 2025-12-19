@@ -12,19 +12,23 @@ class RecruitmentSeeder extends Seeder
 {
     public function run(): void
     {
-        $admin = User::create([
-            'name' => 'Admin User',
-            'email' => 'admin@example.com',
-            'password' => Hash::make('password'),
-            'role' => 'admin',
-        ]);
+        $admin = User::firstOrCreate(
+            ['email' => 'admin@example.com'],
+            [
+                'name' => 'Admin User',
+                'password' => Hash::make('password'),
+                'role' => 'admin',
+            ]
+        );
 
-        $recruiter = User::create([
-            'name' => 'Recruiter User',
-            'email' => 'recruiter@example.com',
-            'password' => Hash::make('password'),
-            'role' => 'recruiter',
-        ]);
+        $recruiter = User::firstOrCreate(
+            ['email' => 'recruiter@example.com'],
+            [
+                'name' => 'Recruiter User',
+                'password' => Hash::make('password'),
+                'role' => 'recruiter',
+            ]
+        );
 
         $recruitments = [
             [
@@ -113,9 +117,16 @@ class RecruitmentSeeder extends Seeder
         ];
 
         foreach ($recruitments as $recruitmentData) {
-            $recruitment = Recruitment::create($recruitmentData);
+            $recruitment = Recruitment::firstOrCreate(
+                [
+                    'title' => $recruitmentData['title'],
+                    'company_name' => $recruitmentData['company_name'],
+                ],
+                $recruitmentData
+            );
 
-            if ($recruitment->status === 'published') {
+            // Only create applications if they don't exist yet
+            if ($recruitment->status === 'published' && $recruitment->applications()->count() === 0) {
                 for ($i = 0; $i < rand(2, 5); $i++) {
                     Application::create([
                         'recruitment_id' => $recruitment->id,

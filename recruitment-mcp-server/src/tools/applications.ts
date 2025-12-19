@@ -14,10 +14,7 @@ export async function listApplications(
   apiClient: LaravelApiClient,
   params: z.infer<typeof listApplicationsSchema>
 ) {
-  const applications = await apiClient.listApplications(params);
-
-  // Get recruitment details for context
-  const recruitment = await apiClient.getRecruitment(params.recruitment_id);
+  const result = await apiClient.listApplications(params);
 
   return {
     content: [
@@ -27,16 +24,16 @@ export async function listApplications(
           uri: 'component://applications-list',
           mimeType: 'text/html',
           text: JSON.stringify({
-            recruitment_id: recruitment.id,
-            recruitment_title: recruitment.title,
-            applications: applications.map((app) => ({
+            recruitment_id: result.recruitment_id,
+            recruitment_title: result.recruitment_title,
+            applications: result.applications.map((app) => ({
               id: app.id,
               applicant_name: app.applicant_name,
               applicant_email: app.applicant_email,
               status: app.status,
               applied_at: app.applied_at,
             })),
-            total: applications.length,
+            total: result.total,
           }),
         },
       },
