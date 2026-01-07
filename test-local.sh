@@ -76,6 +76,13 @@ if [ ! -f "artisan" ]; then
     exit 1
 fi
 
+# Check if port 8004 is already in use
+if lsof -Pi :8004 -sTCP:LISTEN -t >/dev/null 2>&1; then
+    echo -e "${YELLOW}⚠️  Port 8004 already in use, stopping existing process...${NC}"
+    lsof -ti :8004 | xargs kill -9 2>/dev/null
+    sleep 1
+fi
+
 php artisan serve --port=8004 > /tmp/laravel-api.log 2>&1 &
 LARAVEL_PID=$!
 
@@ -117,6 +124,14 @@ echo ""
 
 # Step 4: Start MCP HTTP Server
 echo -e "${YELLOW}🚀 Starting MCP HTTP Server...${NC}"
+
+# Check if port 3000 is already in use
+if lsof -Pi :3000 -sTCP:LISTEN -t >/dev/null 2>&1; then
+    echo -e "${YELLOW}⚠️  Port 3000 already in use, stopping existing process...${NC}"
+    lsof -ti :3000 | xargs kill -9 2>/dev/null
+    sleep 1
+fi
+
 npm run start:http > /tmp/mcp-server.log 2>&1 &
 MCP_PID=$!
 

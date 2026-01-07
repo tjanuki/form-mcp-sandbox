@@ -51,10 +51,26 @@ export class LaravelApiClient {
   async listRecruitments(
     params?: ListRecruitmentsParams
   ): Promise<PaginatedResponse<Recruitment>> {
-    const response = await this.client.get<PaginatedResponse<Recruitment>>('/api/recruitments', {
+    const response = await this.client.get<{
+      data: Recruitment[];
+      meta: {
+        current_page: number;
+        per_page: number;
+        total: number;
+        last_page: number;
+      };
+    }>('/api/recruitments', {
       params,
     });
-    return response.data;
+
+    // Transform Laravel's nested response to flat structure
+    return {
+      data: response.data.data,
+      current_page: response.data.meta.current_page,
+      per_page: response.data.meta.per_page,
+      total: response.data.meta.total,
+      last_page: response.data.meta.last_page,
+    };
   }
 
   /**
