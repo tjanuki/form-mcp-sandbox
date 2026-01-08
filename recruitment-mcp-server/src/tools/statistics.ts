@@ -16,15 +16,16 @@ export async function getRecruitmentStatistics(
 ) {
   const stats = await apiClient.getStatistics(params);
 
+  const statusSummary = Object.entries(stats.by_status || {})
+    .map(([status, count]) => `${status}: ${count}`)
+    .join(', ');
+
   return {
+    structuredContent: stats,
     content: [
       {
-        type: 'resource' as const,
-        resource: {
-          uri: 'component://statistics-dashboard',
-          mimeType: 'text/html',
-          text: JSON.stringify(stats),
-        },
+        type: 'text' as const,
+        text: `Recruitment Statistics: Total recruitments: ${stats.total_recruitments}. By status: ${statusSummary}. Total applications: ${stats.total_applications}.`,
       },
     ],
   };

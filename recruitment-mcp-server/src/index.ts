@@ -349,14 +349,19 @@ export function createMCPServer(): Server {
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
 
+    console.error(`🔧 Tool called: ${name}`);
+    console.error(`   Arguments:`, JSON.stringify(args, null, 2));
+
     try {
       switch (name) {
         // Recruitment tools
         case 'list_recruitments':
-          return await recruitmentTools.listRecruitments(
+          const listResult = await recruitmentTools.listRecruitments(
             apiClient,
             recruitmentTools.listRecruitmentsSchema.parse(args)
           );
+          console.error(`   ✅ list_recruitments returned ${listResult.content.length} items`);
+          return listResult;
 
         case 'get_recruitment_details':
           return await recruitmentTools.getRecruitmentDetails(

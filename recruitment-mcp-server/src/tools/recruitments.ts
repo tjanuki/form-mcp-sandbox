@@ -64,31 +64,34 @@ export async function listRecruitments(
 ) {
   const result = await apiClient.listRecruitments(params);
 
+  console.error(`   📊 API returned ${result.data.length} recruitments`);
+  console.error(`   📄 Pagination: page ${result.current_page}/${result.last_page}, total ${result.total}`);
+
+  const recruitments = result.data.map((r) => ({
+    id: r.id,
+    title: r.title,
+    company_name: r.company_name,
+    location: r.location,
+    employment_type: r.employment_type,
+    salary_range: r.salary_min && r.salary_max
+      ? `${r.salary_currency} ${r.salary_min.toLocaleString()} - ${r.salary_max.toLocaleString()}`
+      : undefined,
+    status: r.status,
+    published_at: r.published_at,
+  }));
+
   return {
+    structuredContent: {
+      recruitments,
+      total: result.total,
+      current_page: result.current_page,
+      per_page: result.per_page,
+      last_page: result.last_page,
+    },
     content: [
       {
-        type: 'resource' as const,
-        resource: {
-          uri: 'component://recruitment-list',
-          mimeType: 'text/html',
-          text: JSON.stringify({
-            recruitments: result.data.map((r) => ({
-              id: r.id,
-              title: r.title,
-              company_name: r.company_name,
-              location: r.location,
-              employment_type: r.employment_type,
-              salary_range: r.salary_min && r.salary_max
-                ? `${r.salary_currency} ${r.salary_min.toLocaleString()} - ${r.salary_max.toLocaleString()}`
-                : undefined,
-              status: r.status,
-              published_at: r.published_at,
-            })),
-            total: result.total,
-            current_page: result.current_page,
-            per_page: result.per_page,
-          }),
-        },
+        type: 'text' as const,
+        text: `Found ${result.total} recruitment(s) (page ${result.current_page}/${result.last_page}). ${recruitments.map(r => `${r.id}: ${r.title} at ${r.company_name} (${r.status})`).join('; ')}`,
       },
     ],
   };
@@ -100,35 +103,32 @@ export async function getRecruitmentDetails(
 ) {
   const recruitment = await apiClient.getRecruitment(params.recruitment_id);
 
+  const details = {
+    id: recruitment.id,
+    title: recruitment.title,
+    company_name: recruitment.company_name,
+    location: recruitment.location,
+    employment_type: recruitment.employment_type,
+    salary_range: recruitment.salary_min && recruitment.salary_max
+      ? `${recruitment.salary_currency} ${recruitment.salary_min.toLocaleString()} - ${recruitment.salary_max.toLocaleString()}`
+      : undefined,
+    description: recruitment.description,
+    requirements: recruitment.requirements,
+    responsibilities: recruitment.responsibilities,
+    benefits: recruitment.benefits,
+    application_deadline: recruitment.application_deadline,
+    status: recruitment.status,
+    applications_count: (recruitment as any).applications?.length || recruitment.applications_count || 0,
+    created_at: recruitment.created_at,
+    published_at: recruitment.published_at,
+  };
+
   return {
+    structuredContent: { recruitment: details },
     content: [
       {
-        type: 'resource' as const,
-        resource: {
-          uri: 'component://recruitment-detail',
-          mimeType: 'text/html',
-          text: JSON.stringify({
-            recruitment: {
-              id: recruitment.id,
-              title: recruitment.title,
-              company_name: recruitment.company_name,
-              location: recruitment.location,
-              employment_type: recruitment.employment_type,
-              salary_range: recruitment.salary_min && recruitment.salary_max
-                ? `${recruitment.salary_currency} ${recruitment.salary_min.toLocaleString()} - ${recruitment.salary_max.toLocaleString()}`
-                : undefined,
-              description: recruitment.description,
-              requirements: recruitment.requirements,
-              responsibilities: recruitment.responsibilities,
-              benefits: recruitment.benefits,
-              application_deadline: recruitment.application_deadline,
-              status: recruitment.status,
-              applications_count: (recruitment as any).applications?.length || recruitment.applications_count || 0,
-              created_at: recruitment.created_at,
-              published_at: recruitment.published_at,
-            },
-          }),
-        },
+        type: 'text' as const,
+        text: `Recruitment #${details.id}: ${details.title} at ${details.company_name}. Location: ${details.location}. Type: ${details.employment_type}. Status: ${details.status}. ${details.salary_range ? `Salary: ${details.salary_range}.` : ''} Applications: ${details.applications_count}. Description: ${details.description}`,
       },
     ],
   };
@@ -141,22 +141,19 @@ export async function createRecruitment(
   const recruitment = await apiClient.createRecruitment(params);
 
   return {
+    structuredContent: {
+      action: 'created',
+      recruitment: {
+        id: recruitment.id,
+        title: recruitment.title,
+        company_name: recruitment.company_name,
+        status: recruitment.status,
+      },
+    },
     content: [
       {
-        type: 'resource' as const,
-        resource: {
-          uri: 'component://recruitment-form',
-          mimeType: 'text/html',
-          text: JSON.stringify({
-            action: 'created',
-            recruitment: {
-              id: recruitment.id,
-              title: recruitment.title,
-              company_name: recruitment.company_name,
-              status: recruitment.status,
-            },
-          }),
-        },
+        type: 'text' as const,
+        text: `Successfully created recruitment #${recruitment.id}: "${recruitment.title}" at ${recruitment.company_name}. Status: ${recruitment.status}.`,
       },
     ],
   };
@@ -172,22 +169,19 @@ export async function updateRecruitment(
   );
 
   return {
+    structuredContent: {
+      action: 'updated',
+      recruitment: {
+        id: recruitment.id,
+        title: recruitment.title,
+        company_name: recruitment.company_name,
+        status: recruitment.status,
+      },
+    },
     content: [
       {
-        type: 'resource' as const,
-        resource: {
-          uri: 'component://recruitment-form',
-          mimeType: 'text/html',
-          text: JSON.stringify({
-            action: 'updated',
-            recruitment: {
-              id: recruitment.id,
-              title: recruitment.title,
-              company_name: recruitment.company_name,
-              status: recruitment.status,
-            },
-          }),
-        },
+        type: 'text' as const,
+        text: `Successfully updated recruitment #${recruitment.id}: "${recruitment.title}" at ${recruitment.company_name}. Status: ${recruitment.status}.`,
       },
     ],
   };
@@ -200,10 +194,14 @@ export async function deleteRecruitment(
   await apiClient.deleteRecruitment(params.recruitment_id);
 
   return {
+    structuredContent: {
+      action: 'deleted',
+      recruitment_id: params.recruitment_id,
+    },
     content: [
       {
         type: 'text' as const,
-        text: `Successfully deleted recruitment #${params.recruitment_id}`,
+        text: `Successfully deleted recruitment #${params.recruitment_id}.`,
       },
     ],
   };
@@ -216,10 +214,18 @@ export async function publishRecruitment(
   const recruitment = await apiClient.publishRecruitment(params.recruitment_id);
 
   return {
+    structuredContent: {
+      action: 'published',
+      recruitment: {
+        id: recruitment.id,
+        title: recruitment.title,
+        status: recruitment.status,
+      },
+    },
     content: [
       {
         type: 'text' as const,
-        text: `Successfully published recruitment "${recruitment.title}" (ID: ${recruitment.id})`,
+        text: `Successfully published recruitment #${recruitment.id}: "${recruitment.title}".`,
       },
     ],
   };
