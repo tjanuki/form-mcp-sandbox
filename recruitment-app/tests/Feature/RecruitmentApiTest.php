@@ -185,4 +185,66 @@ class RecruitmentApiTest extends TestCase
             'status' => 'published',
         ]);
     }
+
+    public function test_duplicate_recruitment_returns_existing_within_60_seconds(): void
+    {
+        $data = [
+            'title' => 'Duplicate Test Position',
+            'company_name' => 'Test Corp',
+            'location' => 'Remote',
+            'employment_type' => 'full-time',
+            'description' => 'Test description',
+            'requirements' => 'Test requirements',
+            'responsibilities' => 'Test responsibilities',
+        ];
+
+        // First request - should create
+        $response1 = $this->withHeader('Authorization', "Bearer {$this->adminToken}")
+            ->postJson('/api/recruitments', $data);
+
+        $response1->assertStatus(201);
+        $createdId = $response1->json('data.id');
+
+        // Second request with same data - should return existing (200, not 201)
+        $response2 = $this->withHeader('Authorization', "Bearer {$this->adminToken}")
+            ->postJson('/api/recruitments', $data);
+
+        $response2->assertStatus(200);
+        $this->assertEquals($createdId, $response2->json('data.id'));
+
+        // Only one record should exist
+        $this->assertEquals(1, Recruitment::where('title', 'Duplicate Test Position')->count());
+    }
+
+    public function test_different_users_can_create_same_recruitment(): void
+    {
+        // Verify users have different IDs
+        $this->assertNotEquals($this->admin->id, $this->recruiter->id);
+
+        $data = [
+            'title' => 'Same Position Different User',
+            'company_name' => 'Company',
+            'location' => 'Location',
+            'employment_type' => 'full-time',
+            'description' => 'Description',
+            'requirements' => 'Requirements',
+            'responsibilities' => 'Responsibilities',
+        ];
+
+        // Admin creates (using actingAs for reliable auth in tests)
+        $response1 = $this->actingAs($this->admin)
+            ->postJson('/api/recruitments', $data);
+        $response1->assertStatus(201);
+
+        $recruitment1 = Recruitment::first();
+        $this->assertEquals($this->admin->id, $recruitment1->created_by);
+
+        // Recruiter creates same - should be allowed (different user)
+        $response2 = $this->actingAs($this->recruiter)
+            ->postJson('/api/recruitments', $data);
+        $response2->assertStatus(201);
+
+        // Two records should exist
+        $this->assertEquals(2, Recruitment::where('title', 'Same Position Different User')->count());
+    }
 }

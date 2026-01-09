@@ -51,6 +51,21 @@ class RecruitmentController extends Controller
         $validated = $request->validated();
         $validated['created_by'] = $request->user()->id;
 
+        // Dedupe guard: Check for identical draft created within last 60 seconds by same user
+        $existing = Recruitment::where('created_by', $validated['created_by'])
+            ->where('title', $validated['title'])
+            ->where('company_name', $validated['company_name'])
+            ->where('location', $validated['location'])
+            ->where('employment_type', $validated['employment_type'])
+            ->where('created_at', '>=', now()->subSeconds(60))
+            ->first();
+
+        if ($existing) {
+            return (new RecruitmentResource($existing->load('creator')))
+                ->response()
+                ->setStatusCode(200);
+        }
+
         if (isset($validated['status']) && $validated['status'] === 'published') {
             $validated['published_at'] = now();
         }
