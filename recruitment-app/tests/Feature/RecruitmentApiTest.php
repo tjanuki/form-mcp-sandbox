@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Recruitment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Passport\Passport;
 use Tests\TestCase;
 
 class RecruitmentApiTest extends TestCase
@@ -14,9 +15,6 @@ class RecruitmentApiTest extends TestCase
     protected User $admin;
     protected User $recruiter;
     protected User $viewer;
-    protected string $adminToken;
-    protected string $recruiterToken;
-    protected string $viewerToken;
 
     protected function setUp(): void
     {
@@ -25,18 +23,14 @@ class RecruitmentApiTest extends TestCase
         $this->admin = User::factory()->create(['role' => 'admin']);
         $this->recruiter = User::factory()->create(['role' => 'recruiter']);
         $this->viewer = User::factory()->create(['role' => 'viewer']);
-
-        $this->adminToken = $this->admin->createToken('test')->plainTextToken;
-        $this->recruiterToken = $this->recruiter->createToken('test')->plainTextToken;
-        $this->viewerToken = $this->viewer->createToken('test')->plainTextToken;
     }
 
     public function test_authenticated_user_can_list_recruitments(): void
     {
         Recruitment::factory()->count(3)->create(['created_by' => $this->admin->id]);
 
-        $response = $this->withHeader('Authorization', "Bearer {$this->adminToken}")
-            ->getJson('/api/recruitments');
+        Passport::actingAs($this->admin);
+        $response = $this->getJson('/api/recruitments');
 
         $response->assertStatus(200)
             ->assertJsonStructure([
@@ -75,8 +69,8 @@ class RecruitmentApiTest extends TestCase
             'status' => 'draft',
         ];
 
-        $response = $this->withHeader('Authorization', "Bearer {$this->adminToken}")
-            ->postJson('/api/recruitments', $data);
+        Passport::actingAs($this->admin);
+        $response = $this->postJson('/api/recruitments', $data);
 
         $response->assertStatus(201)
             ->assertJsonFragment(['title' => 'Senior Developer']);
@@ -99,8 +93,8 @@ class RecruitmentApiTest extends TestCase
             'responsibilities' => 'Write code',
         ];
 
-        $response = $this->withHeader('Authorization', "Bearer {$this->recruiterToken}")
-            ->postJson('/api/recruitments', $data);
+        Passport::actingAs($this->recruiter);
+        $response = $this->postJson('/api/recruitments', $data);
 
         $response->assertStatus(201);
     }
@@ -117,8 +111,8 @@ class RecruitmentApiTest extends TestCase
             'responsibilities' => 'Responsibilities',
         ];
 
-        $response = $this->withHeader('Authorization', "Bearer {$this->viewerToken}")
-            ->postJson('/api/recruitments', $data);
+        Passport::actingAs($this->viewer);
+        $response = $this->postJson('/api/recruitments', $data);
 
         $response->assertStatus(403);
     }
@@ -127,10 +121,10 @@ class RecruitmentApiTest extends TestCase
     {
         $recruitment = Recruitment::factory()->create(['created_by' => $this->recruiter->id]);
 
-        $response = $this->withHeader('Authorization', "Bearer {$this->recruiterToken}")
-            ->putJson("/api/recruitments/{$recruitment->id}", [
-                'title' => 'Updated Title',
-            ]);
+        Passport::actingAs($this->recruiter);
+        $response = $this->putJson("/api/recruitments/{$recruitment->id}", [
+            'title' => 'Updated Title',
+        ]);
 
         $response->assertStatus(200)
             ->assertJsonFragment(['title' => 'Updated Title']);
@@ -145,10 +139,10 @@ class RecruitmentApiTest extends TestCase
     {
         $recruitment = Recruitment::factory()->create(['created_by' => $this->admin->id]);
 
-        $response = $this->withHeader('Authorization', "Bearer {$this->recruiterToken}")
-            ->putJson("/api/recruitments/{$recruitment->id}", [
-                'title' => 'Hacked Title',
-            ]);
+        Passport::actingAs($this->recruiter);
+        $response = $this->putJson("/api/recruitments/{$recruitment->id}", [
+            'title' => 'Hacked Title',
+        ]);
 
         $response->assertStatus(403);
     }
@@ -157,8 +151,8 @@ class RecruitmentApiTest extends TestCase
     {
         $recruitment = Recruitment::factory()->create(['created_by' => $this->recruiter->id]);
 
-        $response = $this->withHeader('Authorization', "Bearer {$this->recruiterToken}")
-            ->deleteJson("/api/recruitments/{$recruitment->id}");
+        Passport::actingAs($this->recruiter);
+        $response = $this->deleteJson("/api/recruitments/{$recruitment->id}");
 
         $response->assertStatus(200);
 
@@ -174,8 +168,8 @@ class RecruitmentApiTest extends TestCase
             'status' => 'draft',
         ]);
 
-        $response = $this->withHeader('Authorization', "Bearer {$this->recruiterToken}")
-            ->patchJson("/api/recruitments/{$recruitment->id}/publish");
+        Passport::actingAs($this->recruiter);
+        $response = $this->patchJson("/api/recruitments/{$recruitment->id}/publish");
 
         $response->assertStatus(200)
             ->assertJsonFragment(['status' => 'published']);
@@ -198,16 +192,16 @@ class RecruitmentApiTest extends TestCase
             'responsibilities' => 'Test responsibilities',
         ];
 
+        Passport::actingAs($this->admin);
+
         // First request - should create
-        $response1 = $this->withHeader('Authorization', "Bearer {$this->adminToken}")
-            ->postJson('/api/recruitments', $data);
+        $response1 = $this->postJson('/api/recruitments', $data);
 
         $response1->assertStatus(201);
         $createdId = $response1->json('data.id');
 
         // Second request with same data - should return existing (200, not 201)
-        $response2 = $this->withHeader('Authorization', "Bearer {$this->adminToken}")
-            ->postJson('/api/recruitments', $data);
+        $response2 = $this->postJson('/api/recruitments', $data);
 
         $response2->assertStatus(200);
         $this->assertEquals($createdId, $response2->json('data.id'));
@@ -231,17 +225,17 @@ class RecruitmentApiTest extends TestCase
             'responsibilities' => 'Responsibilities',
         ];
 
-        // Admin creates (using actingAs for reliable auth in tests)
-        $response1 = $this->actingAs($this->admin)
-            ->postJson('/api/recruitments', $data);
+        // Admin creates
+        Passport::actingAs($this->admin);
+        $response1 = $this->postJson('/api/recruitments', $data);
         $response1->assertStatus(201);
 
         $recruitment1 = Recruitment::first();
         $this->assertEquals($this->admin->id, $recruitment1->created_by);
 
         // Recruiter creates same - should be allowed (different user)
-        $response2 = $this->actingAs($this->recruiter)
-            ->postJson('/api/recruitments', $data);
+        Passport::actingAs($this->recruiter);
+        $response2 = $this->postJson('/api/recruitments', $data);
         $response2->assertStatus(201);
 
         // Two records should exist

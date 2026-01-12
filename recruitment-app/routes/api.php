@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\OAuthController;
 use App\Http\Controllers\Api\RecruitmentController;
 use App\Http\Controllers\Api\ApplicationController;
 use App\Http\Controllers\Api\StatisticsController;
@@ -9,7 +10,11 @@ use Illuminate\Support\Facades\Route;
 Route::post('/auth/register', [AuthController::class, 'register']);
 Route::post('/auth/login', [AuthController::class, 'login']);
 
-Route::middleware('auth:sanctum')->group(function () {
+// OAuth endpoints for MCP server token validation
+Route::post('/oauth/token/introspect', [OAuthController::class, 'introspect']);
+Route::middleware('auth:api')->get('/oauth/userinfo', [OAuthController::class, 'userinfo']);
+
+Route::middleware('auth:api')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/user', [AuthController::class, 'user']);
 

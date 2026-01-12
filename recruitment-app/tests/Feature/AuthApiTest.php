@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Laravel\Passport\Passport;
 use Tests\TestCase;
 
 class AuthApiTest extends TestCase
@@ -85,10 +86,9 @@ class AuthApiTest extends TestCase
     public function test_authenticated_user_can_logout(): void
     {
         $user = User::factory()->create();
-        $token = $user->createToken('test-token')->plainTextToken;
 
-        $response = $this->withHeader('Authorization', "Bearer {$token}")
-            ->postJson('/api/auth/logout');
+        Passport::actingAs($user);
+        $response = $this->postJson('/api/auth/logout');
 
         $response->assertStatus(200)
             ->assertJson(['message' => 'Logged out successfully']);
@@ -97,10 +97,9 @@ class AuthApiTest extends TestCase
     public function test_authenticated_user_can_get_profile(): void
     {
         $user = User::factory()->create(['name' => 'John Doe']);
-        $token = $user->createToken('test-token')->plainTextToken;
 
-        $response = $this->withHeader('Authorization', "Bearer {$token}")
-            ->getJson('/api/auth/user');
+        Passport::actingAs($user);
+        $response = $this->getJson('/api/auth/user');
 
         $response->assertStatus(200)
             ->assertJsonPath('data.id', $user->id)
