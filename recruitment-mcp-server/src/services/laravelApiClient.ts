@@ -189,14 +189,15 @@ export class LaravelApiClient {
 }
 
 /**
- * Create and export a singleton instance
+ * Create a LaravelApiClient instance
+ * @param token Optional OAuth token. If not provided, falls back to LARAVEL_API_TOKEN env var
  */
-export function createLaravelApiClient(): LaravelApiClient {
+export function createLaravelApiClient(token?: string): LaravelApiClient {
   const apiUrl = process.env.LARAVEL_API_URL || 'http://localhost:8000';
-  const apiToken = process.env.LARAVEL_API_TOKEN || '';
+  const apiToken = token || process.env.LARAVEL_API_TOKEN || '';
 
   if (!apiToken) {
-    throw new Error('LARAVEL_API_TOKEN environment variable is required');
+    throw new Error('No API token provided and LARAVEL_API_TOKEN environment variable is not set');
   }
 
   return new LaravelApiClient(apiUrl, apiToken);

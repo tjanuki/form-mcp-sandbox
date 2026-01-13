@@ -5,7 +5,8 @@ import cors from 'cors';
 import { config } from 'dotenv';
 import { createServer } from 'http';
 import { createMCPServer } from './index.js';
-import { randomUUID } from 'crypto';
+import { extractBearerToken, validateOAuthToken } from './middleware/oauth.js';
+import type { OAuthSession } from './types/auth.types.js';
 
 // Load environment variables
 config();
@@ -15,6 +16,12 @@ const PORT = process.env.PORT || 3000;
 
 // Store active SSE transports by session ID
 const activeTransports = new Map<string, SSEServerTransport>();
+
+// Store OAuth sessions by session ID (for user context on /message requests)
+const sessionUsers = new Map<string, OAuthSession>();
+
+// Check if OAuth is enabled (can be disabled for local development)
+const OAUTH_ENABLED = process.env.OAUTH_ENABLED !== 'false';
 
 // ==================== Middleware ====================
 
@@ -76,14 +83,52 @@ const handleSSEConnection = async (req: Request, res: Response) => {
   console.log('   User-Agent:', req.headers['user-agent'] || 'unknown');
 
   try {
+    let oauthSession: OAuthSession | undefined;
+
+    // OAuth validation (if enabled)
+    if (OAUTH_ENABLED) {
+      const token = extractBearerToken(req);
+
+      if (!token) {
+        console.log('❌ OAuth: No Bearer token provided');
+        return res.status(401).json({
+          error: 'Authorization required',
+          message: 'Bearer token must be provided in Authorization header'
+        });
+      }
+
+      const user = await validateOAuthToken(token);
+
+      if (!user) {
+        console.log('❌ OAuth: Token validation failed');
+        return res.status(401).json({
+          error: 'Invalid or expired token',
+          message: 'The provided token is invalid or has expired'
+        });
+      }
+
+      oauthSession = { user, accessToken: token };
+      console.log(`✅ OAuth: Authenticated as ${user.email} (${user.role})`);
+    } else {
+      console.log('⚠️  OAuth: Disabled (OAUTH_ENABLED=false)');
+    }
+
     // Create a new MCP server instance for this connection
-    const server = createMCPServer();
+    const server = createMCPServer(oauthSession ? {
+      user: oauthSession.user,
+      accessToken: oauthSession.accessToken
+    } : undefined);
 
     // Create SSE transport (it will generate its own sessionId internally)
     const transport = new SSEServerTransport('/message', res);
 
     // Store transport using its internally generated sessionId
     activeTransports.set(transport.sessionId, transport);
+
+    // Store OAuth session for this connection (for /message requests)
+    if (oauthSession) {
+      sessionUsers.set(transport.sessionId, oauthSession);
+    }
 
     console.log('✅ MCP server connected via SSE');
     console.log('   Session ID:', transport.sessionId);
@@ -96,6 +141,7 @@ const handleSSEConnection = async (req: Request, res: Response) => {
     res.on('close', () => {
       console.log('❌ Client disconnected - Session:', transport.sessionId);
       activeTransports.delete(transport.sessionId);
+      sessionUsers.delete(transport.sessionId);
     });
 
   } catch (error) {

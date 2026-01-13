@@ -19,6 +19,7 @@ import { createLaravelApiClient } from './services/laravelApiClient.js';
 import * as recruitmentTools from './tools/recruitments.js';
 import * as applicationTools from './tools/applications.js';
 import * as statisticsTools from './tools/statistics.js';
+import type { MCPServerOptions, AuthenticatedUser } from './types/auth.types.js';
 
 // Load environment variables
 config();
@@ -34,10 +35,16 @@ const SERVER_VERSION = process.env.MCP_SERVER_VERSION || '1.0.0';
 /**
  * Create and configure MCP server instance
  * This function can be used by both stdio and HTTP transports
+ * @param options Optional configuration including user context and access token
  */
-export function createMCPServer(): Server {
-  // Initialize Laravel API client
-  const apiClient = createLaravelApiClient();
+export function createMCPServer(options?: MCPServerOptions): Server {
+  // Initialize Laravel API client with optional OAuth token
+  const apiClient = createLaravelApiClient(options?.accessToken);
+  const user = options?.user;
+
+  if (user) {
+    console.error(`🔐 MCP Server created for user: ${user.email} (${user.role})`);
+  }
 
   // Create MCP server instance
   const server = new Server(
