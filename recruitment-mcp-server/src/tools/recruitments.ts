@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { LaravelApiClient } from '../services/laravelApiClient.js';
+import type { AuthenticatedUser } from '../types/auth.types.js';
 
 // ==================== Schema Definitions ====================
 
@@ -56,13 +57,42 @@ export const publishRecruitmentSchema = z.object({
   recruitment_id: z.number(),
 });
 
+// ==================== Tool Context ====================
+
+export interface ToolContext {
+  user?: AuthenticatedUser;
+}
+
+/**
+ * Check if user is admin
+ */
+function isAdmin(user?: AuthenticatedUser): boolean {
+  return user?.role === 'admin';
+}
+
 // ==================== Tool Implementations ====================
 
 export async function listRecruitments(
   apiClient: LaravelApiClient,
-  params: z.infer<typeof listRecruitmentsSchema>
+  params: z.infer<typeof listRecruitmentsSchema>,
+  context?: ToolContext
 ) {
-  const result = await apiClient.listRecruitments(params);
+  // For non-admin users, filter to only show their own recruitments
+  const apiParams: {
+    status?: typeof params.status;
+    search?: string;
+    employment_type?: typeof params.employment_type;
+    limit: number;
+    page: number;
+    created_by?: number;
+  } = { ...params };
+
+  if (context?.user && !isAdmin(context.user)) {
+    apiParams.created_by = context.user.user_id;
+    console.error(`   🔒 User-scoped filter: created_by=${context.user.user_id}`);
+  }
+
+  const result = await apiClient.listRecruitments(apiParams);
 
   console.error(`   📊 API returned ${result.data.length} recruitments`);
   console.error(`   📄 Pagination: page ${result.current_page}/${result.last_page}, total ${result.total}`);
@@ -99,8 +129,10 @@ export async function listRecruitments(
 
 export async function getRecruitmentDetails(
   apiClient: LaravelApiClient,
-  params: z.infer<typeof getRecruitmentDetailsSchema>
+  params: z.infer<typeof getRecruitmentDetailsSchema>,
+  context?: ToolContext
 ) {
+  // Authorization is handled by Laravel policy via the OAuth token
   const recruitment = await apiClient.getRecruitment(params.recruitment_id);
 
   const details = {
@@ -136,8 +168,10 @@ export async function getRecruitmentDetails(
 
 export async function createRecruitment(
   apiClient: LaravelApiClient,
-  params: z.infer<typeof createRecruitmentSchema>
+  params: z.infer<typeof createRecruitmentSchema>,
+  context?: ToolContext
 ) {
+  // created_by is set by Laravel using the authenticated user from the OAuth token
   const recruitment = await apiClient.createRecruitment(params);
 
   return {
@@ -161,8 +195,10 @@ export async function createRecruitment(
 
 export async function updateRecruitment(
   apiClient: LaravelApiClient,
-  params: z.infer<typeof updateRecruitmentSchema>
+  params: z.infer<typeof updateRecruitmentSchema>,
+  context?: ToolContext
 ) {
+  // Authorization is handled by Laravel policy via the OAuth token
   const recruitment = await apiClient.updateRecruitment(
     params.recruitment_id,
     params.updates
@@ -189,8 +225,10 @@ export async function updateRecruitment(
 
 export async function deleteRecruitment(
   apiClient: LaravelApiClient,
-  params: z.infer<typeof deleteRecruitmentSchema>
+  params: z.infer<typeof deleteRecruitmentSchema>,
+  context?: ToolContext
 ) {
+  // Authorization is handled by Laravel policy via the OAuth token
   await apiClient.deleteRecruitment(params.recruitment_id);
 
   return {
@@ -209,8 +247,10 @@ export async function deleteRecruitment(
 
 export async function publishRecruitment(
   apiClient: LaravelApiClient,
-  params: z.infer<typeof publishRecruitmentSchema>
+  params: z.infer<typeof publishRecruitmentSchema>,
+  context?: ToolContext
 ) {
+  // Authorization is handled by Laravel policy via the OAuth token
   const recruitment = await apiClient.publishRecruitment(params.recruitment_id);
 
   return {

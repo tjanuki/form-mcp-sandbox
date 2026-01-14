@@ -18,6 +18,11 @@ class RecruitmentController extends Controller
 
         $query = Recruitment::query()->with('creator')->withCount('applications');
 
+        // Filter by creator (user-scoped access for non-admin users)
+        if ($request->has('created_by')) {
+            $query->where('created_by', $request->created_by);
+        }
+
         if ($request->has('status')) {
             $query->where('status', $request->status);
         }

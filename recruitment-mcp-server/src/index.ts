@@ -352,12 +352,18 @@ export function createMCPServer(options?: MCPServerOptions): Server {
     };
   });
 
+  // Create tool context for user-scoped operations
+  const toolContext: recruitmentTools.ToolContext = { user };
+
   // Handle tool calls
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
 
     console.error(`🔧 Tool called: ${name}`);
     console.error(`   Arguments:`, JSON.stringify(args, null, 2));
+    if (user) {
+      console.error(`   👤 User: ${user.email} (${user.role})`);
+    }
 
     try {
       switch (name) {
@@ -365,7 +371,8 @@ export function createMCPServer(options?: MCPServerOptions): Server {
         case 'list_recruitments':
           const listResult = await recruitmentTools.listRecruitments(
             apiClient,
-            recruitmentTools.listRecruitmentsSchema.parse(args)
+            recruitmentTools.listRecruitmentsSchema.parse(args),
+            toolContext
           );
           console.error(`   ✅ list_recruitments returned ${listResult.content.length} items`);
           return listResult;
@@ -373,31 +380,36 @@ export function createMCPServer(options?: MCPServerOptions): Server {
         case 'get_recruitment_details':
           return await recruitmentTools.getRecruitmentDetails(
             apiClient,
-            recruitmentTools.getRecruitmentDetailsSchema.parse(args)
+            recruitmentTools.getRecruitmentDetailsSchema.parse(args),
+            toolContext
           );
 
         case 'create_recruitment':
           return await recruitmentTools.createRecruitment(
             apiClient,
-            recruitmentTools.createRecruitmentSchema.parse(args)
+            recruitmentTools.createRecruitmentSchema.parse(args),
+            toolContext
           );
 
         case 'update_recruitment':
           return await recruitmentTools.updateRecruitment(
             apiClient,
-            recruitmentTools.updateRecruitmentSchema.parse(args)
+            recruitmentTools.updateRecruitmentSchema.parse(args),
+            toolContext
           );
 
         case 'delete_recruitment':
           return await recruitmentTools.deleteRecruitment(
             apiClient,
-            recruitmentTools.deleteRecruitmentSchema.parse(args)
+            recruitmentTools.deleteRecruitmentSchema.parse(args),
+            toolContext
           );
 
         case 'publish_recruitment':
           return await recruitmentTools.publishRecruitment(
             apiClient,
-            recruitmentTools.publishRecruitmentSchema.parse(args)
+            recruitmentTools.publishRecruitmentSchema.parse(args),
+            toolContext
           );
 
         // Application tools

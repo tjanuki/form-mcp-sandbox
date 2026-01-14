@@ -73,6 +73,7 @@ export interface ListRecruitmentsParams {
   employment_type?: EmploymentType;
   limit?: number;
   page?: number;
+  created_by?: number;  // Filter by user ID for user-scoped access
 }
 
 export interface CreateRecruitmentParams {
