@@ -155,7 +155,7 @@ echo ""
 echo -e "${YELLOW}🏥 Testing health endpoints...${NC}"
 
 # Test Laravel
-LARAVEL_HEALTH=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8004/api/recruitments 2>/dev/null)
+LARAVEL_HEALTH=$(curl -s -o /dev/null -w "%{http_code}" -H "Accept: application/json" http://localhost:8004/api/recruitments 2>/dev/null)
 if [ "$LARAVEL_HEALTH" = "200" ] || [ "$LARAVEL_HEALTH" = "401" ]; then
     echo -e "${GREEN}✅ Laravel API responding${NC}"
 else

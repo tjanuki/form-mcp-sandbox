@@ -58,6 +58,23 @@ app.get('/health', (req: Request, res: Response) => {
   });
 });
 
+// OAuth Authorization Server Metadata (RFC 8414)
+// ChatGPT uses this to discover OAuth endpoints
+app.get('/.well-known/oauth-authorization-server', (req: Request, res: Response) => {
+  const laravelUrl = process.env.LARAVEL_OAUTH_URL || process.env.LARAVEL_API_URL || 'http://localhost:8004';
+
+  res.json({
+    issuer: laravelUrl,
+    authorization_endpoint: `${laravelUrl}/oauth/authorize`,
+    token_endpoint: `${laravelUrl}/oauth/token`,
+    token_endpoint_auth_methods_supported: ['none', 'client_secret_post'],
+    grant_types_supported: ['authorization_code', 'refresh_token'],
+    response_types_supported: ['code'],
+    code_challenge_methods_supported: ['S256'],
+    scopes_supported: ['*'],
+  });
+});
+
 // Server info endpoint
 app.get('/info', (req: Request, res: Response) => {
   res.json({
