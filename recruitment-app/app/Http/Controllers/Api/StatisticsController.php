@@ -15,6 +15,11 @@ class StatisticsController extends Controller
     {
         $query = Recruitment::query();
 
+        // Filter by creator (user-scoped access for non-admin users)
+        if ($request->has('created_by')) {
+            $query->where('created_by', $request->created_by);
+        }
+
         if ($request->has('date_from')) {
             $query->where('created_at', '>=', $request->date_from);
         }
@@ -25,20 +30,31 @@ class StatisticsController extends Controller
 
         $totalRecruitments = $query->count();
 
-        $byStatus = Recruitment::select('status', DB::raw('count(*) as count'))
-            ->groupBy('status')
+        // Apply same created_by filter to all aggregate queries
+        $statusQuery = Recruitment::select('status', DB::raw('count(*) as count'));
+        $typeQuery = Recruitment::select('employment_type', DB::raw('count(*) as count'));
+        $activityQuery = Recruitment::with('creator')->latest('updated_at')->limit(10);
+        $applicationsQuery = Application::query();
+
+        if ($request->has('created_by')) {
+            $statusQuery->where('created_by', $request->created_by);
+            $typeQuery->where('created_by', $request->created_by);
+            $activityQuery->where('created_by', $request->created_by);
+            // For applications, filter by recruitments owned by the user
+            $applicationsQuery->whereHas('recruitment', function ($q) use ($request) {
+                $q->where('created_by', $request->created_by);
+            });
+        }
+
+        $byStatus = $statusQuery->groupBy('status')
             ->pluck('count', 'status')
             ->toArray();
 
-        $byEmploymentType = Recruitment::select('employment_type', DB::raw('count(*) as count'))
-            ->groupBy('employment_type')
+        $byEmploymentType = $typeQuery->groupBy('employment_type')
             ->pluck('count', 'employment_type')
             ->toArray();
 
-        $recentActivity = Recruitment::with('creator')
-            ->latest('updated_at')
-            ->limit(10)
-            ->get()
+        $recentActivity = $activityQuery->get()
             ->map(function ($recruitment) {
                 return [
                     'recruitment_title' => $recruitment->title,
@@ -47,7 +63,7 @@ class StatisticsController extends Controller
                 ];
             });
 
-        $totalApplications = Application::count();
+        $totalApplications = $applicationsQuery->count();
 
         return response()->json([
             'total_recruitments' => $totalRecruitments,
@@ -63,10 +79,16 @@ class StatisticsController extends Controller
         ]);
     }
 
-    public function byStatus(): JsonResponse
+    public function byStatus(Request $request): JsonResponse
     {
-        $byStatus = Recruitment::select('status', DB::raw('count(*) as count'))
-            ->groupBy('status')
+        $query = Recruitment::select('status', DB::raw('count(*) as count'));
+
+        // Filter by creator (user-scoped access for non-admin users)
+        if ($request->has('created_by')) {
+            $query->where('created_by', $request->created_by);
+        }
+
+        $byStatus = $query->groupBy('status')
             ->pluck('count', 'status');
 
         return response()->json($byStatus);

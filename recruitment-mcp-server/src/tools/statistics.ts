@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { LaravelApiClient } from '../services/laravelApiClient.js';
+import type { AuthenticatedUser } from '../types/auth.types.js';
 
 // ==================== Schema Definitions ====================
 
@@ -8,13 +9,39 @@ export const getRecruitmentStatisticsSchema = z.object({
   date_to: z.string().optional(),
 });
 
+// ==================== Tool Context ====================
+
+export interface ToolContext {
+  user?: AuthenticatedUser;
+}
+
+/**
+ * Check if user is admin
+ */
+function isAdmin(user?: AuthenticatedUser): boolean {
+  return user?.role === 'admin';
+}
+
 // ==================== Tool Implementations ====================
 
 export async function getRecruitmentStatistics(
   apiClient: LaravelApiClient,
-  params: z.infer<typeof getRecruitmentStatisticsSchema>
+  params: z.infer<typeof getRecruitmentStatisticsSchema>,
+  context?: ToolContext
 ) {
-  const stats = await apiClient.getStatistics(params);
+  // For non-admin users, filter statistics to only their own recruitments
+  const apiParams: {
+    date_from?: string;
+    date_to?: string;
+    created_by?: number;
+  } = { ...params };
+
+  if (context?.user && !isAdmin(context.user)) {
+    apiParams.created_by = context.user.user_id;
+    console.error(`   🔒 User-scoped statistics: created_by=${context.user.user_id}`);
+  }
+
+  const stats = await apiClient.getStatistics(apiParams);
 
   const statusSummary = Object.entries(stats.by_status || {})
     .map(([status, count]) => `${status}: ${count}`)

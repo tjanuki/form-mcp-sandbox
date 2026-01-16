@@ -416,14 +416,16 @@ export function createMCPServer(options?: MCPServerOptions): Server {
         case 'list_applications':
           return await applicationTools.listApplications(
             apiClient,
-            applicationTools.listApplicationsSchema.parse(args)
+            applicationTools.listApplicationsSchema.parse(args),
+            toolContext
           );
 
         // Statistics tools
         case 'get_recruitment_statistics':
           return await statisticsTools.getRecruitmentStatistics(
             apiClient,
-            statisticsTools.getRecruitmentStatisticsSchema.parse(args)
+            statisticsTools.getRecruitmentStatisticsSchema.parse(args),
+            toolContext
           );
 
         default:
