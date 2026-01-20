@@ -1,12 +1,18 @@
 import { z } from 'zod';
 import type { LaravelApiClient } from '../services/laravelApiClient.js';
 import type { AuthenticatedUser } from '../types/auth.types.js';
+import { sanitizeDateString } from '../services/sanitizer.js';
+
+// ==================== Sanitized String Schemas ====================
+
+/** Sanitized date string with ISO format validation */
+const sanitizedDate = z.string().transform((val) => sanitizeDateString(val));
 
 // ==================== Schema Definitions ====================
 
 export const getRecruitmentStatisticsSchema = z.object({
-  date_from: z.string().optional(),
-  date_to: z.string().optional(),
+  date_from: sanitizedDate.optional(),
+  date_to: sanitizedDate.optional(),
 });
 
 // ==================== Tool Context ====================

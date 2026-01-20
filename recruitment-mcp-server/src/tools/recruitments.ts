@@ -1,12 +1,32 @@
 import { z } from 'zod';
 import type { LaravelApiClient } from '../services/laravelApiClient.js';
 import type { AuthenticatedUser } from '../types/auth.types.js';
+import {
+  zodSanitizeTitle,
+  zodSanitizeDescription,
+  zodSanitizeSearch,
+  sanitizeDateString,
+} from '../services/sanitizer.js';
+
+// ==================== Sanitized String Schemas ====================
+
+/** Sanitized title field (max 255 chars, stripped HTML, no newlines) */
+const sanitizedTitle = z.string().transform(zodSanitizeTitle());
+
+/** Sanitized description field (max 10000 chars, stripped HTML, preserves newlines) */
+const sanitizedDescription = z.string().transform(zodSanitizeDescription());
+
+/** Sanitized search query (max 200 chars, stripped HTML) */
+const sanitizedSearch = z.string().transform(zodSanitizeSearch());
+
+/** Sanitized date string with ISO format validation */
+const sanitizedDate = z.string().transform((val) => sanitizeDateString(val));
 
 // ==================== Schema Definitions ====================
 
 export const listRecruitmentsSchema = z.object({
   status: z.enum(['draft', 'published', 'closed', 'filled']).optional(),
-  search: z.string().optional(),
+  search: sanitizedSearch.optional(),
   employment_type: z.enum(['full-time', 'part-time', 'contract', 'internship']).optional(),
   limit: z.number().default(10),
   page: z.number().default(1),
@@ -17,34 +37,34 @@ export const getRecruitmentDetailsSchema = z.object({
 });
 
 export const createRecruitmentSchema = z.object({
-  title: z.string(),
-  company_name: z.string(),
-  location: z.string(),
+  title: sanitizedTitle,
+  company_name: sanitizedTitle,
+  location: sanitizedTitle,
   employment_type: z.enum(['full-time', 'part-time', 'contract', 'internship']),
   salary_min: z.number().optional(),
   salary_max: z.number().optional(),
-  description: z.string(),
-  requirements: z.string(),
-  responsibilities: z.string(),
-  benefits: z.string().optional(),
-  application_deadline: z.string().optional(),
+  description: sanitizedDescription,
+  requirements: sanitizedDescription,
+  responsibilities: sanitizedDescription,
+  benefits: sanitizedDescription.optional(),
+  application_deadline: sanitizedDate.optional(),
   status: z.enum(['draft', 'published']).default('draft'),
 });
 
 export const updateRecruitmentSchema = z.object({
   recruitment_id: z.number(),
   updates: z.object({
-    title: z.string().optional(),
-    company_name: z.string().optional(),
-    location: z.string().optional(),
+    title: sanitizedTitle.optional(),
+    company_name: sanitizedTitle.optional(),
+    location: sanitizedTitle.optional(),
     employment_type: z.enum(['full-time', 'part-time', 'contract', 'internship']).optional(),
     salary_min: z.number().optional(),
     salary_max: z.number().optional(),
-    description: z.string().optional(),
-    requirements: z.string().optional(),
-    responsibilities: z.string().optional(),
-    benefits: z.string().optional(),
-    application_deadline: z.string().optional(),
+    description: sanitizedDescription.optional(),
+    requirements: sanitizedDescription.optional(),
+    responsibilities: sanitizedDescription.optional(),
+    benefits: sanitizedDescription.optional(),
+    application_deadline: sanitizedDate.optional(),
     status: z.enum(['draft', 'published', 'closed', 'filled']).optional(),
   }),
 });
