@@ -102,9 +102,7 @@ describe('LaravelApiClient', () => {
         message: 'Unauthorized',
       });
 
-      await expect(client.listRecruitments()).rejects.toThrow(
-        'Laravel API Error (401): Unauthorized'
-      );
+      await expect(client.listRecruitments()).rejects.toThrow('Unauthorized');
     });
 
     it('should handle 403 Forbidden errors', async () => {
@@ -112,9 +110,7 @@ describe('LaravelApiClient', () => {
         message: 'Forbidden',
       });
 
-      await expect(client.getRecruitment(1)).rejects.toThrow(
-        'Laravel API Error (403): Forbidden'
-      );
+      await expect(client.getRecruitment(1)).rejects.toThrow('Forbidden');
     });
 
     it('should handle 404 Not Found errors', async () => {
@@ -123,7 +119,7 @@ describe('LaravelApiClient', () => {
       });
 
       await expect(client.getRecruitment(999)).rejects.toThrow(
-        'Laravel API Error (404): Recruitment not found'
+        'Resource not found: Recruitment not found'
       );
     });
 
@@ -248,7 +244,7 @@ describe('LaravelApiClient', () => {
       });
 
       await expect(client.getRecruitment(999)).rejects.toThrow(
-        'Laravel API Error (404): Recruitment not found'
+        'Resource not found: Recruitment not found'
       );
     });
   });
@@ -358,7 +354,7 @@ describe('LaravelApiClient', () => {
       });
 
       await expect(client.deleteRecruitment(999)).rejects.toThrow(
-        'Laravel API Error (404): Recruitment not found'
+        'Resource not found: Recruitment not found'
       );
     });
   });
@@ -570,7 +566,7 @@ describe('createLaravelApiClient', () => {
     vi.stubEnv('LARAVEL_API_TOKEN', '');
 
     expect(() => createLaravelApiClient()).toThrow(
-      'No API token provided and LARAVEL_API_TOKEN environment variable is not set'
+      'Missing required configuration: API token (provide token parameter or set LARAVEL_API_TOKEN)'
     );
   });
 });

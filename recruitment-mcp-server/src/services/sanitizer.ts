@@ -5,6 +5,8 @@
  * This layer defends against XSS, script injection, and malformed input at the MCP boundary.
  */
 
+import { Errors } from '../types/errors.js';
+
 /**
  * HTML entities to escape
  */
@@ -180,7 +182,7 @@ export function sanitizeDateString(input: string): string {
   // Validate ISO date format (YYYY-MM-DD or ISO 8601)
   const isoDateRegex = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d{3})?(Z|[+-]\d{2}:\d{2})?)?$/;
   if (!isoDateRegex.test(sanitized)) {
-    throw new Error(`Invalid date format: ${sanitized}. Expected ISO 8601 format (YYYY-MM-DD)`);
+    throw Errors.invalidInput('date', `Invalid date format: ${sanitized}. Expected ISO 8601 format (YYYY-MM-DD)`);
   }
 
   return sanitized;

@@ -10,6 +10,7 @@ import type {
   StatisticsParams,
   ListApplicationsParams,
 } from '../types/recruitment.types.js';
+import { ErrorCode, McpError, Errors } from '../types/errors.js';
 
 export class LaravelApiClient {
   private client: AxiosInstance;
@@ -31,13 +32,28 @@ export class LaravelApiClient {
       (error: AxiosError) => {
         if (error.response) {
           const status = error.response.status;
-          const message = (error.response.data as any)?.message || error.message;
+          const data = error.response.data as Record<string, unknown> | undefined;
+          const message = (data?.message as string) || error.message;
 
-          throw new Error(`Laravel API Error (${status}): ${message}`);
+          // Map HTTP status codes to specific error types
+          if (status === 401) {
+            throw Errors.unauthorized(message, data);
+          } else if (status === 403) {
+            throw Errors.forbidden(message, data);
+          } else if (status === 404) {
+            throw Errors.notFound(message, data);
+          } else if (status === 422) {
+            throw Errors.validationFailed(message, data);
+          } else if (status === 429) {
+            const retryAfter = error.response.headers['retry-after'];
+            throw Errors.rateLimited(retryAfter ? parseInt(retryAfter, 10) : undefined);
+          } else {
+            throw Errors.apiError(status, message, data);
+          }
         } else if (error.request) {
-          throw new Error('Laravel API is unreachable. Please check the server.');
+          throw Errors.apiUnreachable(error);
         } else {
-          throw new Error(`Request error: ${error.message}`);
+          throw Errors.requestFailed(error.message, error);
         }
       }
     );
@@ -197,7 +213,7 @@ export function createLaravelApiClient(token?: string): LaravelApiClient {
   const apiToken = token || process.env.LARAVEL_API_TOKEN || '';
 
   if (!apiToken) {
-    throw new Error('No API token provided and LARAVEL_API_TOKEN environment variable is not set');
+    throw Errors.missingConfig('API token (provide token parameter or set LARAVEL_API_TOKEN)');
   }
 
   return new LaravelApiClient(apiUrl, apiToken);

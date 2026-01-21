@@ -20,6 +20,7 @@ import * as recruitmentTools from './tools/recruitments.js';
 import * as applicationTools from './tools/applications.js';
 import * as statisticsTools from './tools/statistics.js';
 import type { MCPServerOptions, AuthenticatedUser } from './types/auth.types.js';
+import { McpError, Errors } from './types/errors.js';
 
 // Load environment variables
 config();
@@ -117,7 +118,7 @@ export function createMCPServer(options?: MCPServerOptions): Server {
     const resource = componentResources.find((r) => r.uri === request.params.uri);
 
     if (!resource) {
-      throw new Error(`Resource not found: ${request.params.uri}`);
+      throw Errors.notFound(request.params.uri);
     }
 
     try {
@@ -134,7 +135,10 @@ export function createMCPServer(options?: MCPServerOptions): Server {
         ],
       };
     } catch (error) {
-      throw new Error(`Failed to read resource: ${error}`);
+      throw Errors.internal(
+        `Failed to read resource: ${resource.uri}`,
+        error instanceof Error ? error : undefined
+      );
     }
   });
 
@@ -429,16 +433,38 @@ export function createMCPServer(options?: MCPServerOptions): Server {
           );
 
         default:
-          throw new Error(`Unknown tool: ${name}`);
+          throw Errors.unknownTool(name);
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      let errorMessage: string;
+      let errorDetails: Record<string, unknown> | undefined;
+
+      if (McpError.isMcpError(error)) {
+        errorMessage = error.message;
+        errorDetails = error.toJSON();
+        console.error(`   ❌ McpError [${error.code}]: ${error.message}`);
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+        console.error(`   ❌ Error: ${error.message}`);
+      } else {
+        errorMessage = String(error);
+        console.error(`   ❌ Unknown error: ${errorMessage}`);
+      }
+
       return {
         content: [
           {
             type: 'text' as const,
             text: `Error executing tool ${name}: ${errorMessage}`,
           },
+          ...(errorDetails
+            ? [
+                {
+                  type: 'text' as const,
+                  text: `Details: ${JSON.stringify(errorDetails, null, 2)}`,
+                },
+              ]
+            : []),
         ],
         isError: true,
       };
