@@ -1,4 +1,5 @@
-import axios, { AxiosInstance, AxiosError } from 'axios';
+import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
+import { randomUUID } from 'crypto';
 import type {
   Recruitment,
   Application,
@@ -11,6 +12,17 @@ import type {
   ListApplicationsParams,
 } from '../types/recruitment.types.js';
 import { ErrorCode, McpError, Errors } from '../types/errors.js';
+import { logger } from './logger.js';
+
+// Extend AxiosRequestConfig to include metadata for timing
+declare module 'axios' {
+  interface InternalAxiosRequestConfig {
+    metadata?: {
+      requestId: string;
+      startTime: number;
+    };
+  }
+}
 
 export class LaravelApiClient {
   private client: AxiosInstance;
@@ -26,10 +38,51 @@ export class LaravelApiClient {
       timeout: 10000,
     });
 
-    // Error interceptor
+    // Request logging interceptor
+    this.client.interceptors.request.use((config) => {
+      const requestId = randomUUID();
+      config.metadata = {
+        requestId,
+        startTime: Date.now(),
+      };
+      config.headers['X-Request-ID'] = requestId;
+
+      logger.debug('API Request', {
+        requestId,
+        method: config.method?.toUpperCase(),
+        url: config.url,
+        params: config.params,
+      });
+
+      return config;
+    });
+
+    // Response logging interceptor
     this.client.interceptors.response.use(
-      (response) => response,
+      (response) => {
+        const { requestId, startTime } = response.config.metadata ?? {};
+        const duration = startTime ? Date.now() - startTime : undefined;
+
+        logger.debug('API Response', {
+          requestId,
+          status: response.status,
+          url: response.config.url,
+          duration,
+        });
+
+        return response;
+      },
       (error: AxiosError) => {
+        const { requestId, startTime } = error.config?.metadata ?? {};
+        const duration = startTime ? Date.now() - startTime : undefined;
+
+        logger.error('API Error', {
+          requestId,
+          status: error.response?.status,
+          url: error.config?.url,
+          message: error.message,
+          duration,
+        });
         if (error.response) {
           const status = error.response.status;
           const data = error.response.data as Record<string, unknown> | undefined;
