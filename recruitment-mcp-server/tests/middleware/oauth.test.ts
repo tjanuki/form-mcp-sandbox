@@ -211,6 +211,119 @@ describe('OAuth Middleware', () => {
       });
     });
 
+    describe('proactive token refresh', () => {
+      it('should proactively refresh token when approaching expiry', async () => {
+        vi.useFakeTimers();
+
+        // Token expires in 2 minutes - refresh threshold at ~80% (96s) or 1 min before (60s)
+        const twoMinuteResponse = {
+          ...mockValidIntrospectResponse,
+          exp: Math.floor(Date.now() / 1000) + 120,
+        };
+
+        mockAxios.onPost('http://localhost:8000/api/oauth/token/introspect').reply(200, twoMinuteResponse);
+
+        // First call - validates and caches
+        await validateOAuthToken('refresh-test-token');
+        expect(mockAxios.history.post.length).toBe(1);
+
+        // Advance time to before refresh threshold (50 seconds - well under 60s threshold)
+        vi.advanceTimersByTime(50000);
+
+        // Should use cache without refreshing
+        await validateOAuthToken('refresh-test-token');
+        expect(mockAxios.history.post.length).toBe(1);
+
+        // Advance time to past refresh threshold (65 seconds total, past 60s threshold)
+        vi.advanceTimersByTime(20000);
+
+        // Should proactively refresh
+        await validateOAuthToken('refresh-test-token');
+        expect(mockAxios.history.post.length).toBe(2);
+
+        vi.useRealTimers();
+      });
+
+      it('should use cached user if refresh fails but token is still valid', async () => {
+        vi.useFakeTimers();
+
+        const twoMinuteResponse = {
+          ...mockValidIntrospectResponse,
+          exp: Math.floor(Date.now() / 1000) + 120,
+        };
+
+        // First call succeeds
+        mockAxios.onPost('http://localhost:8000/api/oauth/token/introspect').replyOnce(200, twoMinuteResponse);
+
+        await validateOAuthToken('resilient-token');
+        expect(mockAxios.history.post.length).toBe(1);
+
+        // Advance to refresh threshold
+        vi.advanceTimersByTime(70000);
+
+        // Refresh fails with network error
+        mockAxios.onPost('http://localhost:8000/api/oauth/token/introspect').networkErrorOnce();
+
+        // Should still return cached user since token hasn't expired
+        const user = await validateOAuthToken('resilient-token');
+        expect(user).not.toBeNull();
+        expect(user?.email).toBe(mockValidIntrospectResponse.email);
+
+        vi.useRealTimers();
+      });
+
+      it('should refresh threshold be calculated at 80% of TTL for longer-lived tokens', async () => {
+        vi.useFakeTimers();
+
+        // Token expires in 5 minutes (300s)
+        // 80% threshold = 240s, 1 min before = 240s
+        const fiveMinuteResponse = {
+          ...mockValidIntrospectResponse,
+          exp: Math.floor(Date.now() / 1000) + 300,
+        };
+
+        mockAxios.onPost('http://localhost:8000/api/oauth/token/introspect').reply(200, fiveMinuteResponse);
+
+        await validateOAuthToken('long-lived-token');
+        expect(mockAxios.history.post.length).toBe(1);
+
+        // At 200s (before 80% threshold of 240s), should use cache
+        vi.advanceTimersByTime(200000);
+        await validateOAuthToken('long-lived-token');
+        expect(mockAxios.history.post.length).toBe(1);
+
+        // At 250s (past 80% threshold), should refresh
+        vi.advanceTimersByTime(50000);
+        await validateOAuthToken('long-lived-token');
+        expect(mockAxios.history.post.length).toBe(2);
+
+        vi.useRealTimers();
+      });
+
+      it('should remove expired token from cache and revalidate', async () => {
+        vi.useFakeTimers();
+
+        const shortLivedResponse = {
+          ...mockValidIntrospectResponse,
+          exp: Math.floor(Date.now() / 1000) + 30, // 30 seconds
+        };
+
+        mockAxios.onPost('http://localhost:8000/api/oauth/token/introspect').reply(200, shortLivedResponse);
+
+        await validateOAuthToken('expiring-token');
+        expect(mockAxios.history.post.length).toBe(1);
+
+        // Advance past expiration
+        vi.advanceTimersByTime(35000);
+
+        // Should remove expired token and revalidate
+        await validateOAuthToken('expiring-token');
+        expect(mockAxios.history.post.length).toBe(2);
+
+        vi.useRealTimers();
+      });
+    });
+
     describe('error handling', () => {
       it('should return null on network error', async () => {
         mockAxios.onPost('http://localhost:8000/api/oauth/token/introspect').networkError();
